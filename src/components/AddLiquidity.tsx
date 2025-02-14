@@ -4,6 +4,7 @@ import MockCamelotV3PoolAbi from "@/lib/abi/MockCamelotV3Pool.abi.json";
 import UsdcAbi from "@/lib/abi/usdc.abi.json";
 import WethAbi from "@/lib/abi/weth.abi.json";
 import { useProtocolKit } from "@/provider/ProtocolKitContext";
+import { parseToken } from "@/utils/parseToken";
 import { MetaTransactionData } from "@safe-global/safe-core-sdk-types";
 import { ethers } from "ethers";
 import { useSearchParams } from "next/navigation";
@@ -16,8 +17,9 @@ import { Button } from "./ui/button";
 const AddLiquidity = () => {
   const [liquidity, setLiquidity] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { connectedSafe } = useProtocolKit();
+  const { connectedSafe, protocolKit } = useProtocolKit();
   const searchParams = useSearchParams();
+  const PERCENTAGE_FACTOR = 10000;
 
   const poolId = searchParams.get("id");
   const upperRange = searchParams.get("upperRange");
@@ -195,12 +197,85 @@ const AddLiquidity = () => {
     const Ierc20 = new ethers.Interface(erc20Abi);
     const IWeth = new ethers.Interface(WethAbi);
     const IUsdc = new ethers.Interface(UsdcAbi);
+    const ICamelotLiquidityManager = new ethers.Interface(
+      CamelotLiquidityManagerAbi
+    );
 
+    const transactions: MetaTransactionData[] = [];
     // 1. Faucet
-
+    const wethFaucet = {
+      to: wethAddress as `0x${string}`,
+      data: IWeth.encodeFunctionData("mintToAddress", [
+        connectedSafe,
+        parseToken(liquidity.toString()),
+      ]),
+      value: "0",
+    };
+    const usdcFaucet = {
+      to: usdcAddress as `0x${string}`,
+      data: IUsdc.encodeFunctionData("mintToAddress", [
+        connectedSafe,
+        parseToken(liquidity.toString()),
+      ]),
+      value: "0",
+    };
     // 2. Approve
-
+    const wethApprove = {
+      to: wethAddress as `0x${string}`,
+      data: Ierc20.encodeFunctionData("approve", [
+        CamelotLiquidityManager,
+        parseToken(liquidity.toString()),
+      ]),
+      value: "0",
+    };
+    const usdcApprove = {
+      to: usdcAddress as `0x${string}`,
+      data: Ierc20.encodeFunctionData("approve", [
+        CamelotLiquidityManager,
+        parseToken(liquidity.toString()),
+      ]),
+      value: "0",
+    };
     // 3. Add liquidity
+    const addLiquidity = {
+      to: CamelotLiquidityManager as `0x${string}`,
+      data: ICamelotLiquidityManager.encodeFunctionData("addLiquidity", [
+        Number(lowerRange).toFixed(0),
+        Number(upperRange).toFixed(0),
+        parseToken(liquidity.toString()),
+      ]),
+      value: "0",
+    };
+
+    transactions.push(
+      wethFaucet,
+      usdcFaucet,
+      wethApprove,
+      usdcApprove,
+      addLiquidity
+    );
+
+    const threshold = await protocolKit?.getThreshold();
+    const safeApproveTx = await protocolKit?.createTransaction({
+      transactions,
+    });
+    if (!safeApproveTx) {
+      throw new Error("Failed to create safe transaction");
+    }
+    if (threshold === 1) {
+      const safeApproveTxResponse = await protocolKit?.executeTransaction(
+        safeApproveTx
+      );
+      // setTransactionLoading(true);
+      if (safeApproveTxResponse) {
+        //@ts-ignore
+        await safeApproveTxResponse?.transactionResponse?.wait();
+      }
+      toast.success("Add Liquidity successfully", { duration: 5000 });
+      // dialogClose();
+    } else {
+      toast("Transaction created, waiting to be executed");
+    }
   };
 
   return (
@@ -209,9 +284,14 @@ const AddLiquidity = () => {
         <AmountInput
           inputAmount={liquidity}
           setInputAmount={setLiquidity}
-          title="Add Liquidity"
+          title="Add Liquidity (TOKEN 1)"
         />
-        <Button disabled={!connectedSafe} size={"lg"} className="w-full mt-4">
+        <Button
+          onClick={addLiquidity}
+          disabled={!connectedSafe || Number(liquidity) <= 0}
+          size={"lg"}
+          className="w-full mt-4"
+        >
           {connectedSafe ? "Add Liquidity" : "Create/Connect Safe Account"}
         </Button>
       </div>
