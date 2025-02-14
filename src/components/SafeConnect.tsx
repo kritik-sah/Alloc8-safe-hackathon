@@ -40,7 +40,7 @@ const SafeConnect = () => {
   return (
     <div className="max-w-7xl mx-auto bg-ui-midnightAccent border border-ui-secondary/10 p-4 rounded-xl my-6 flex items-start justify-between">
       <div className="">
-        <h2 className="text-xl mb-3">Select Safe Account</h2>
+        <h2 className="text-xl mb-3">Select Smart Account</h2>
         <Select
           value={selectedSafe}
           onValueChange={(e) => {
@@ -66,7 +66,7 @@ const SafeConnect = () => {
         </Select>
       </div>
       <div className="">
-        <h2 className="text-xl mb-3">Create Safe Account</h2>
+        <h2 className="text-xl mb-3">Create Smart Account</h2>
         <Button
           onClick={createSafeWallet}
           variant={"default"}
