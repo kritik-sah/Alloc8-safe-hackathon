@@ -45,7 +45,7 @@ const CreateOrFetchSafeContextProvider = ({
   useEffect(() => {
     const fetchSafeWallet = async () => {
       if (!address) return;
-      const data = await fetchData(
+      const data: any = await fetchData(
         `chains/${chain?.id}/owners/${address}/safes`
       );
       console.log("safeAddresses", data);
