@@ -1,7 +1,18 @@
 "use client";
-import { getDefaultConfig, RainbowKitProvider } from "@rainbow-me/rainbowkit";
+import {
+  connectorsForWallets,
+  getDefaultConfig,
+  RainbowKitProvider,
+} from "@rainbow-me/rainbowkit";
+import {
+  coinbaseWallet,
+  injectedWallet,
+  metaMaskWallet,
+  rabbyWallet,
+  walletConnectWallet,
+} from "@rainbow-me/rainbowkit/wallets";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { WagmiProvider } from "wagmi";
+import { createConfig, http, WagmiProvider } from "wagmi";
 import { sepolia } from "wagmi/chains";
 
 /**
@@ -9,7 +20,33 @@ import { sepolia } from "wagmi/chains";
  */
 const projectId = "df7c359544477408a03f68cc41727c83";
 
-const config = getDefaultConfig({
+const connectors = connectorsForWallets(
+  [
+    {
+      groupName: "Recommended",
+      wallets: [
+        rabbyWallet,
+        walletConnectWallet,
+        injectedWallet,
+        coinbaseWallet,
+        metaMaskWallet,
+      ],
+    },
+  ],
+  {
+    appName: "alloc8",
+    projectId: projectId,
+  }
+);
+export const config = createConfig({
+  chains: [sepolia],
+  transports: {
+    [sepolia.id]: http(process.env.NEXT_PUBLIC_SEPOLIA_RPC_URL!),
+  },
+  connectors,
+  ssr: true, // Enable Server Side Rendering (SSR) for the dApp
+});
+const web3config = getDefaultConfig({
   appName: "alloc8",
   projectId: projectId,
   chains: [sepolia],
@@ -23,7 +60,7 @@ const WagmiProviders = ({
   children: React.ReactNode;
 }>) => {
   return (
-    <WagmiProvider config={config}>
+    <WagmiProvider config={web3config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>{children}</RainbowKitProvider>
       </QueryClientProvider>
