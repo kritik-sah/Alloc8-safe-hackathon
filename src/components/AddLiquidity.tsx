@@ -4,6 +4,8 @@ import MockCamelotV3PoolAbi from "@/lib/abi/MockCamelotV3Pool.abi.json";
 import UsdcAbi from "@/lib/abi/usdc.abi.json";
 import WethAbi from "@/lib/abi/weth.abi.json";
 import { useProtocolKit } from "@/provider/ProtocolKitContext";
+import { formatNumber } from "@/utils/formatNumber";
+import { formatToken } from "@/utils/formatToken";
 import { handleCopy } from "@/utils/handleCopy";
 import { parseToken } from "@/utils/parseToken";
 import { truncateAddress } from "@/utils/truncateAddress";
@@ -14,6 +16,7 @@ import React, { useState } from "react";
 import toast from "react-hot-toast";
 import { HiOutlineDocumentDuplicate } from "react-icons/hi";
 import { erc20Abi } from "viem";
+import { useReadContract } from "wagmi";
 import AmountInput from "./AmountInput";
 import { Button } from "./ui/button";
 
@@ -33,22 +36,11 @@ const AddLiquidity = () => {
   const CamelotLiquidityManager = "0xE8af214043f6f7c69FC66e76515258109fA93F95";
   const MockCamelotV3Pool = "0xF604EDdd6FD3Bc615b075f44F32280dECefB19E6";
 
-  const getMinMaxTicks = (tick1?: string | null, tick2?: string | null) => {
-    const num1 = tick1 ? parseFloat(tick1) : NaN;
-    const num2 = tick2 ? parseFloat(tick2) : NaN;
-
-    if (isNaN(num1) && isNaN(num2)) return { min: null, max: null };
-    if (isNaN(num1)) return { min: num2, max: num2 };
-    if (isNaN(num2)) return { min: num1, max: num1 };
-
-    return { min: Math.min(num1, num2), max: Math.max(num1, num2) };
-  };
-
   const handleAsyncOperation = async (operation: () => Promise<void>) => {
     setIsLoading(true);
     try {
       await operation();
-      // refetchAndInvalidateQueries();
+      refetchAndInvalidateQueries();
     } catch (error: any) {
       console.error(error);
       const errorMessage =
@@ -62,240 +54,130 @@ const AddLiquidity = () => {
     }
   };
 
-  // give allowance approval by safe wallet
-  // const handleCallSafeApprove = async () => {
-  //   handleAsyncOperation(async () => {
-  //     const iface_erc20 = new ethers.Interface(erc20Abi);
-  //     const transactions: MetaTransactionData[] = [
-  //       {
-  //         to: selectedTokenInput?.address as `0x${string}`,
-  //         data: iface_erc20.encodeFunctionData("approve", [
-  //           pools[0].borrowManager,
-  //           parseEther(inputAmount.toString()),
-  //         ]),
-  //         value: "0",
-  //       },
-  //     ];
-
-  //     const threshold = await protocolKit?.getThreshold();
-  //     const safeApproveTx = await protocolKit?.createTransaction({
-  //       transactions,
-  //     });
-  //     if (!safeApproveTx) {
-  //       throw new Error("Failed to create borrow credit transaction");
-  //     }
-  //     if (threshold === 1) {
-  //       const safeApproveTxResponse = await protocolKit?.executeTransaction(
-  //         safeApproveTx
-  //       );
-  //       // setTransactionLoading(true);
-  //       if (safeApproveTxResponse) {
-  //         //@ts-ignore
-  //         await safeApproveTxResponse?.transactionResponse?.wait();
-  //       }
-  //       toast.success("Approved successfully", { duration: 5000 });
-  //       // dialogClose();
-  //     } else {
-  //       toast("Transaction created, waiting to be executed");
-  //     }
-  //   });
-  // };
-
-  // const handleSafeBorrowCredit = async () =>
-  //   handleAsyncOperation(async () => {
-  //     if (
-  //       !address ||
-  //       !connectedSafe ||
-  //       !creditAccountOwner ||
-  //       selectedSafe?.safeAddress !== connectedSafe
-  //     ) {
-  //       throw new Error("Safe disconnected or wrong safe connected");
-  //     }
-  //     const iface_borrowCredit = new ethers.Interface(borrowManagerAbi);
-  //     const leverageAmount = Number(inputAmount || 0) * leverage;
-  //     const transactions: MetaTransactionData[] = [
-  //       {
-  //         to: pools[0].borrowManager,
-  //         data: iface_borrowCredit.encodeFunctionData("borrowCredit", [
-  //           parseEther(leverageAmount.toString()),
-  //         ]),
-  //         value: "0",
-  //       },
-  //     ];
-  //     const threshold = await protocolKit?.getThreshold();
-  //     const borrowCreditTx = await protocolKit?.createTransaction({
-  //       transactions,
-  //     });
-  //     if (threshold === 1 && borrowCreditTx) {
-  //       const borrowCreditTxResponse = await protocolKit?.executeTransaction(
-  //         borrowCreditTx
-  //       );
-  //       await borrowCreditTxResponse?.transactionResponse?.wait();
-
-  //       sendGAEvent("event", "leverage_borrow_credit", {
-  //         address: JSON.stringify(address),
-  //         borrowManager: JSON.stringify(pools[0].borrowManager),
-  //         leverageAccount: JSON.stringify(connectedSafe),
-  //         value: inputAmount,
-  //         token: JSON.stringify(pools[0].underlyingToken),
-  //       });
-  //       toast.success("Borrowed successfully", { duration: 5000 });
-  //       setInputAmount("");
-  //     } else {
-  //       toast("Transaction created, waiting to be executed");
-  //     }
-  //   });
-
-  // const handleCallRepayDebt = async () =>
-  //   handleAsyncOperation(async () => {
-  //     const iface_borrowManager = new ethers.Interface(borrowManagerAbi);
-  //     const iface_erc20 = new ethers.Interface(erc20Abi);
-  //     const transactions: MetaTransactionData[] = [
-  //       {
-  //         to: pools[0].borrowManager as `0x${string}`,
-  //         data: iface_borrowManager.encodeFunctionData("repayDebt", [
-  //           parseEther(inputAmount.toString()),
-  //         ]),
-  //         value: "0",
-  //       },
-  //     ];
-  //     if (
-  //       Number(formatToken(safeCollateralAllowance || BigInt(0))) <=
-  //       Number(inputAmount)
-  //     ) {
-  //       transactions.unshift({
-  //         to: selectedTokenInput?.address as `0x${string}`,
-  //         data: iface_erc20.encodeFunctionData("approve", [
-  //           pools[0].borrowManager,
-  //           parseEther(inputAmount.toString()),
-  //         ]),
-  //         value: "0",
-  //       });
-  //     }
-
-  //     const threshold = await protocolKit?.getThreshold();
-  //     const repayDebtTx = await protocolKit?.createTransaction({
-  //       transactions,
-  //     });
-  //     if (threshold === 1 && repayDebtTx) {
-  //       const repayDebtTxResponse = await protocolKit?.executeTransaction(
-  //         repayDebtTx
-  //       );
-  //       await repayDebtTxResponse?.transactionResponse?.wait();
-  //       sendGAEvent("event", "leverage_repay_debt", {
-  //         address: JSON.stringify(address),
-  //         borrowManager: JSON.stringify(pools[0].borrowManager),
-  //         leverageAccount: JSON.stringify(connectedSafe),
-  //         value: inputAmount,
-  //         token: JSON.stringify(pools[0].underlyingToken),
-  //       });
-  //       toast.success("Repaid successfully", { duration: 5000 });
-  //       setInputAmount("");
-  //     } else {
-  //       toast("Transaction created, waiting to be executed");
-  //     }
-  //   });
+  const { data: liquidityPositions, refetch: refetchLiquidityPositions } =
+    useReadContract({
+      abi: MockCamelotV3PoolAbi,
+      address: MockCamelotV3Pool as `0x${string}`,
+      functionName: "liquidityPositions",
+      args: [connectedSafe],
+    });
 
   const addLiquidity = async () => {
-    const Ierc20 = new ethers.Interface(erc20Abi);
-    const IWeth = new ethers.Interface(WethAbi);
-    const IUsdc = new ethers.Interface(UsdcAbi);
-    const ICamelotLiquidityManager = new ethers.Interface(
-      CamelotLiquidityManagerAbi
-    );
-
-    const transactions: MetaTransactionData[] = [];
-    // 1. Faucet
-    const wethFaucet = {
-      to: wethAddress as `0x${string}`,
-      data: IWeth.encodeFunctionData("mintToAddress", [
-        connectedSafe,
-        parseToken(liquidity.toString()),
-      ]),
-      value: "0",
-    };
-    const usdcFaucet = {
-      to: usdcAddress as `0x${string}`,
-      data: IUsdc.encodeFunctionData("mintToAddress", [
-        connectedSafe,
-        parseToken(liquidity.toString()),
-      ]),
-      value: "0",
-    };
-    // 2. Approve
-    const wethApprove = {
-      to: wethAddress as `0x${string}`,
-      data: Ierc20.encodeFunctionData("approve", [
-        CamelotLiquidityManager,
-        parseToken(liquidity.toString()),
-      ]),
-      value: "0",
-    };
-    const usdcApprove = {
-      to: usdcAddress as `0x${string}`,
-      data: Ierc20.encodeFunctionData("approve", [
-        CamelotLiquidityManager,
-        parseToken(liquidity.toString()),
-      ]),
-      value: "0",
-    };
-    // 3. Add liquidity
-    const addLiquidity = {
-      to: CamelotLiquidityManager as `0x${string}`,
-      data: ICamelotLiquidityManager.encodeFunctionData("addLiquidity", [
-        Number(lowerRange).toFixed(0),
-        Number(upperRange).toFixed(0),
-        parseToken(liquidity.toString()),
-      ]),
-      value: "0",
-    };
-
-    transactions.push(
-      wethFaucet,
-      usdcFaucet,
-      wethApprove,
-      usdcApprove,
-      addLiquidity
-    );
-
-    const threshold = await protocolKit?.getThreshold();
-    const safeApproveTx = await protocolKit?.createTransaction({
-      transactions,
-    });
-    if (!safeApproveTx) {
-      throw new Error("Failed to create safe transaction");
-    }
-    if (threshold === 1) {
-      const safeApproveTxResponse = await protocolKit?.executeTransaction(
-        safeApproveTx
+    handleAsyncOperation(async () => {
+      const Ierc20 = new ethers.Interface(erc20Abi);
+      const IWeth = new ethers.Interface(WethAbi);
+      const IUsdc = new ethers.Interface(UsdcAbi);
+      const ICamelotLiquidityManager = new ethers.Interface(
+        CamelotLiquidityManagerAbi
       );
-      // setTransactionLoading(true);
-      if (safeApproveTxResponse) {
-        //@ts-ignore
-        await safeApproveTxResponse?.transactionResponse?.wait();
+
+      const transactions: MetaTransactionData[] = [];
+      // 1. Faucet
+      const wethFaucet = {
+        to: wethAddress as `0x${string}`,
+        data: IWeth.encodeFunctionData("mintToAddress", [
+          connectedSafe,
+          parseToken(liquidity.toString()),
+        ]),
+        value: "0",
+      };
+      const usdcFaucet = {
+        to: usdcAddress as `0x${string}`,
+        data: IUsdc.encodeFunctionData("mintToAddress", [
+          connectedSafe,
+          parseToken(liquidity.toString()),
+        ]),
+        value: "0",
+      };
+      // 2. Approve
+      const wethApprove = {
+        to: wethAddress as `0x${string}`,
+        data: Ierc20.encodeFunctionData("approve", [
+          CamelotLiquidityManager,
+          parseToken(liquidity.toString()),
+        ]),
+        value: "0",
+      };
+      const usdcApprove = {
+        to: usdcAddress as `0x${string}`,
+        data: Ierc20.encodeFunctionData("approve", [
+          CamelotLiquidityManager,
+          parseToken(liquidity.toString()),
+        ]),
+        value: "0",
+      };
+      // 3. Add liquidity
+      const addLiquidity = {
+        to: CamelotLiquidityManager as `0x${string}`,
+        data: ICamelotLiquidityManager.encodeFunctionData("addLiquidity", [
+          Number(lowerRange).toFixed(0),
+          Number(upperRange).toFixed(0),
+          parseToken(liquidity.toString()),
+        ]),
+        value: "0",
+      };
+
+      transactions.push(
+        wethFaucet,
+        usdcFaucet,
+        wethApprove,
+        usdcApprove,
+        addLiquidity
+      );
+
+      const threshold = await protocolKit?.getThreshold();
+      const safeApproveTx = await protocolKit?.createTransaction({
+        transactions,
+      });
+      if (!safeApproveTx) {
+        throw new Error("Failed to create safe transaction");
       }
-      toast.success("Add Liquidity successfully", { duration: 5000 });
-      // dialogClose();
-    } else {
-      toast("Transaction created, waiting to be executed");
-    }
+      if (threshold === 1) {
+        const safeApproveTxResponse = await protocolKit?.executeTransaction(
+          safeApproveTx
+        );
+        // setTransactionLoading(true);
+        if (safeApproveTxResponse) {
+          //@ts-ignore
+          await safeApproveTxResponse?.transactionResponse?.wait();
+        }
+        toast.success("Add Liquidity successfully", { duration: 5000 });
+        // dialogClose();
+      } else {
+        toast("Transaction created, waiting to be executed");
+      }
+    });
   };
 
+  const refetchAndInvalidateQueries = () => {
+    refetchLiquidityPositions();
+  };
   return (
     <div className="flex items-center justify-center">
       <div className="max-w-3xl w-full rounded-xl border border-ui-secondary/10 p-4">
         {connectedSafe ? (
-          <div className="">
-            <p className="inline-flex items-center justify-start gap-1 text-ui-secondary/60 mb-4">
-              Connected Safe :{" "}
-              <span className="text-ui-green">
+          <div className="flex items-center justify-between gap-4 mb-4">
+            <div className="text-ui-secondary/40">
+              <p className="text-sm">Connected Safe</p>
+              <div className="text-ui-green text-lg">
                 {truncateAddress(connectedSafe)}{" "}
                 <HiOutlineDocumentDuplicate
                   className="inline"
                   onClick={handleCopy.bind(null, connectedSafe)}
                 />
-              </span>
-            </p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-ui-secondary/40">
+                Liquidity Positions
+              </p>
+              <p className="text-lg text-ui-secondary/60">
+                {formatNumber(
+                  Number(formatToken(liquidityPositions as bigint))
+                )}{" "}
+                LP TOKEN
+              </p>
+            </div>
           </div>
         ) : null}
 
@@ -306,7 +188,12 @@ const AddLiquidity = () => {
         />
         <Button
           onClick={addLiquidity}
-          disabled={!connectedSafe || Number(liquidity) <= 0}
+          disabled={
+            !connectedSafe ||
+            Number(liquidity) <= 0 ||
+            !upperRange ||
+            !lowerRange
+          }
           size={"lg"}
           className="w-full mt-4"
         >
