@@ -4,12 +4,15 @@ import MockCamelotV3PoolAbi from "@/lib/abi/MockCamelotV3Pool.abi.json";
 import UsdcAbi from "@/lib/abi/usdc.abi.json";
 import WethAbi from "@/lib/abi/weth.abi.json";
 import { useProtocolKit } from "@/provider/ProtocolKitContext";
+import { handleCopy } from "@/utils/handleCopy";
 import { parseToken } from "@/utils/parseToken";
+import { truncateAddress } from "@/utils/truncateAddress";
 import { MetaTransactionData } from "@safe-global/safe-core-sdk-types";
 import { ethers } from "ethers";
 import { useSearchParams } from "next/navigation";
 import React, { useState } from "react";
 import toast from "react-hot-toast";
+import { HiOutlineDocumentDuplicate } from "react-icons/hi";
 import { erc20Abi } from "viem";
 import AmountInput from "./AmountInput";
 import { Button } from "./ui/button";
@@ -281,6 +284,21 @@ const AddLiquidity = () => {
   return (
     <div className="flex items-center justify-center">
       <div className="max-w-3xl w-full rounded-xl border border-ui-secondary/10 p-4">
+        {connectedSafe ? (
+          <div className="">
+            <p className="inline-flex items-center justify-start gap-1 text-ui-secondary/60 mb-4">
+              Connected Safe :{" "}
+              <span className="text-ui-green">
+                {truncateAddress(connectedSafe)}{" "}
+                <HiOutlineDocumentDuplicate
+                  className="inline"
+                  onClick={handleCopy.bind(null, connectedSafe)}
+                />
+              </span>
+            </p>
+          </div>
+        ) : null}
+
         <AmountInput
           inputAmount={liquidity}
           setInputAmount={setLiquidity}

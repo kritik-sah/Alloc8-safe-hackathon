@@ -8,8 +8,10 @@ import {
 } from "@/components/ui/select";
 import { useSafe } from "@/provider/CreateAndFetchSafes";
 import { useProtocolKit } from "@/provider/ProtocolKitContext";
+import { handleCopy } from "@/utils/handleCopy";
 import { truncateAddress } from "@/utils/truncateAddress";
 import React, { useEffect } from "react";
+import { HiOutlineDocumentDuplicate } from "react-icons/hi";
 import { Button } from "./ui/button";
 
 const SafeConnect = () => {
@@ -46,7 +48,9 @@ const SafeConnect = () => {
           }}
         >
           <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Select Safe" />
+            <div className="flex items-center gap-4">
+              <SelectValue placeholder="Select Safe" />
+            </div>
           </SelectTrigger>
           <SelectContent>
             {safeAddresses?.length
